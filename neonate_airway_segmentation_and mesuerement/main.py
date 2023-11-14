@@ -7,10 +7,10 @@ import roi
 import usefull_function as uf
 import segmentation as segment
 import presentation
-import measurment as msure
+import measurment as measure
 import model_3d as m3d
-import measurement_visulization as visul
-import standardization as standart
+import measurement_visulization as visual
+import standardization as standard
 import bone_distance as bone
 import validation
 import tkinter as tk
@@ -20,15 +20,81 @@ def select_location(title):
     path = filedialog.askdirectory(title=title)
     return path
 
-# 1. segmentation, save images, measurement, plot them and save them, 3d model, bone distance, (timeing?)
+# 1. Segmentation, save images, measurement, plot them and save them, 3d model, bone distance
 #
-# 2. save general data, save csa in specific regions, plot CSA standtardization
-# 3. validation an
+# 2. Save general data, save CSA in specific regions, plot CSA standardization
+# 3. validation
 
 
-def main_standardization_3_all():
-    # Load all Excel dataframes
-    path = "C:\\Users\\owner\\Desktop\\cases\\data\\"
+def main_mesurement(path ="",save_path="", plot_measure=True, model3d=True, saving_axial=True,
+                    axial_anim=False, saving_coronal=True, coronal_anim=False, save_data = True,
+                    pa_width=True):
+    if path == "":
+        path = select_location("Select Case Location")
+    if save_path == "":
+        save_path = select_location("Select Save Location")
+
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    os.chdir(save_path)
+
+    slices, images_for_sagittal, images,spacing, reverse = pre.preprocessing(path)
+
+    slices, all_head, images_for_sagittal, images, edge_index, end_open_nose_index, naso_index, end_nasopharynx, \
+    image_type, interferent = roi.voi(slices, images_for_sagittal, images)
+    slices, all_head, roi_images, seg_images, fix_seg_images, open_nostril_index, edge_index = \
+                                        segment.seg_nasal_airway(slices, all_head, images,
+                                        edge_index, end_open_nose_index, naso_index, end_nasopharynx, image_type)
+    # To change the global threshold or the local threshold boundaries, replace the last code line with other HU values
+    # slices, all_head, roi_images, seg_images, fix_seg_images, open_nostril_index, edge_index =
+    # seg_nasal_airway(slices, all_head, images, edge_index, end_open_nose_index, naso_index,
+    #                  end_nasopharynx, image_type, global_thresh = -400 , local_thresh(-400 ,-125))
+
+
+    thickness = spacing[0]
+    spacing = spacing[1:]
+
+    aperture_index = measure.find_aperture(roi_images, edge_index, image_type)
+
+    choana_index = measure.find_choana(fix_seg_images, roi_images)
+    if saving_axial is True:
+        axial_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images,
+                                                 plane_mode="axial", additional_slices= all_head)
+        presentation.save_img(axial_images, save_path=save_path, mode='axial', anim=axial_anim)
+    if saving_coronal is True:
+        coronal_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images,
+                                                       plane_mode="coronal")
+        presentation.save_img(coronal_images, save_path=save_path, mode='coronal', anim=coronal_anim)
+    if model3d is True:
+        m3d.reconstruction3d(fix_seg_images[:,:,:], spacing, thickness, save_path=save_path, connected=True)
+    measurement_data = measure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing,
+                                            image_type)
+    if plot_measure is True:
+        visual.plot(measurement_data[0], aperture_index, choana_index, save_path=save_path)
+        visual.plot_inferior(measurement_data[1], aperture_index, choana_index, save_path=save_path)
+
+    if save_data is True:
+        excelpath = save_path +"\\" + 'measurements.xlsx'
+        sheet_name = [
+            ['cc volume', 'not cc volume', 'cs r data', 'cs l data', 'notcc cs r data', 'notcc cs l data'],
+            ['inferior cc volume', 'inferior not cc volume', 'inferior cs r data', 'inferior cs l data',
+             'inferior notcc cs r data', 'inferior notcc cs l data']]
+        with pd.ExcelWriter(excelpath) as writer:
+            for i in range(0, 12):
+                mode_index = i // 6
+                data_index = i % 6
+                measurement_data[mode_index][data_index].to_excel(writer,
+                                                                 sheet_name=sheet_name[mode_index][data_index])
+    if pa_width is True:
+        bone.measure_bone_distance(fix_seg_images, roi_images, aperture_index, choana_index, spacing,
+                                   thickness, save_path=save_path, hu_scale=True)
+
+
+def main_standardization_3_all(saving_data = False, path=""):
+    # Load all Excel data frames
+    if path == "":
+        path = select_location("Select Case Location")
+   
     normal_list = []
     obstruct_list = []
     surgery_list = []
@@ -36,6 +102,7 @@ def main_standardization_3_all():
     ch_percent_list = []
 
     for mode in ["all", "2connected", "1"]:
+        # "all" CSA - of two nasal sides. "2connected"- only the CSA of the connected airway. "1"- the average CSA of the two sides
         if mode == "1" or mode == "2connected":
             continue
         for i in range(0, 29):
@@ -44,7 +111,7 @@ def main_standardization_3_all():
                 continue
             exel_path = path + uf.CASE_MAP[str(i)] + "(" + str(i) + ")" + '.xlsx'
 
-            df, pa_percent, ch_percent = standart.read(exel_path, mode=mode, inferior=False,
+            df, pa_percent, ch_percent = standard.read(exel_path, mode=mode, inferior=False,
                                                        percent_method="percentage of nasal airway")
             pa_percent_list.append(pa_percent)
             ch_percent_list.append(ch_percent)
@@ -59,12 +126,12 @@ def main_standardization_3_all():
 
     stand_df = []
     for df_list in all_lists:
-        avg_df, std_df = standart.standardize_cases(df_list, percent_col_name="percentage of nasal airway")
+        avg_df, std_df = standard.standardize_cases(df_list, percent_col_name="percentage of nasal airway")
         stand_df.append([avg_df, std_df])
 
-    saving_data = False
+    
     if saving_data:
-        excel_path = "C:\\Users\\owner\\Desktop\\cases\\data\\obstruct_averaging_all" + '(' + mode + ')' + '.xlsx'
+        excel_path = path + "\\" + "stanradization" + '(' + mode + ')' + '.xlsx'
         with pd.ExcelWriter(excel_path) as writer:
             stand_df[0][0].to_excel(writer, sheet_name='averaging normal')
             stand_df[0][1].to_excel(writer, sheet_name='std normal')
@@ -77,16 +144,17 @@ def main_standardization_3_all():
         std_flag = False
     else:
         std_flag = True
-    print(pa_percent_list,np.mean(pa_percent_list) )
+    #print(pa_percent_list,np.mean(pa_percent_list) )
     pa_percent = round(np.mean(pa_percent_list),1)
     ch_percent = round(np.mean(ch_percent_list),1)
-    standart.plot_compare_3(stand_df, std_flag=std_flag, mode=mode, percent_mode="all",
+    standard.plot_compare_3(stand_df, std_flag=std_flag, mode=mode, percent_mode="all",
                             pa_percent=pa_percent, ch_percent=ch_percent,units ="mm")
 
 
-def main_region_averaging():
+def main_region_averaging(path=""):
         # load all exel dataframe
-    path = "C:\\Users\\owner\\Desktop\\cases"
+     if path == "":
+        path = select_location("Select the measurement dictionary")
     df_all = pd.DataFrame(columns=['case','region', 'vol', 'avg area', 'std', 'diagnose'])
 
     for i in range(0, 29):
@@ -113,7 +181,7 @@ def main_region_averaging():
                 digit_percent = int(region[:2])
                 min_percent = digit_percent - 5
                 max_percent = digit_percent + 5
-            vol, avg, std = standart.average(exel_path, slices[3].PixelSpacing[0], inferior=False,
+            vol, avg, std = standard.average(exel_path, slices[3].PixelSpacing[0], inferior=False,
                                              min_percent=min_percent, max_percent=max_percent)
             case_data = pd.DataFrame(
                     {'case': [i], 'region':[region], 'vol': [vol], 'avg area': [avg], 'std': [std], 'diagnose': [diagnose]})
@@ -122,16 +190,17 @@ def main_region_averaging():
 
         saving_data = True
         if saving_data is True:
-            excelpath = "C:\\Users\\owner\\Desktop\\cases\\data\\" + "averaging_region_area.xlsx"
-            with pd.ExcelWriter(excelpath) as writer:
+            excel_path = path + "\\" + "averaging_region_area.xlsx"
+            with pd.ExcelWriter(excel_path) as writer:
                 for region in ["PA", "25%", "50%", "75%", "CH"]:
                     df_all[df_all['region']== region].to_excel(writer, sheet_name=region)
 
 
 
-def main_genral_data():
+def main_genral_data(casepath=""):
     # load all exel dataframe
-    path = "C:\\Users\\owner\\Desktop\\cases"
+    if path == "":
+        path = select_location("Select the measurement dictionary")
     df_all = pd.DataFrame(
         columns=['case', 'vol', 'not c vol', 'surface area', 'vol nostrils', 'vol internal', 'vol naso',
                  'not c nostrils', 'not c internal', 'inferior vol', 'inferior not cc vol', 'not c naso',
@@ -144,8 +213,7 @@ def main_genral_data():
         print(i)
         if i in [1,2,9, 24]:
             continue
-        # slices = pre.load_dicom(path + "\\#" + str(i))
-        exel_path = path + "\\data\\" + uf.CASE_MAP[str(i)] + "(" + str(i) + ")" + '.xlsx'
+        exel_path = path + "\\" + uf.CASE_MAP[str(i)] + "(" + str(i) + ")" + '.xlsx'
         if i in [4, 6, 7, 10, 11]:
             diagnose = 'CNPAS + surgery'
         elif i in [3, 5, 8, 12]:
@@ -195,77 +263,15 @@ def main_genral_data():
 
 
 
-def main_mesurement(path ="",save_path="", plot_measure=True, model3d=True, saving_axial=True,
-                    axial_anim=False, saving_coronal=True, coronal_anim=False, save_data = True,
-                    pa_width=True):
-    if path == "":
-        path = select_location("Select Case Location")
-    if save_path == "":
-        save_path = select_location("Select Save Location")
-
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
-    os.chdir(save_path)
-
-    slices, images_for_sagittal, images,spacing, reverse = pre.preprocessing(path)
-
-    slices, all_head, images_for_sagittal, images, edge_index, end_open_nose_index, naso_index, end_nasopharynx, \
-    image_type, interferent = roi.voi(slices, images_for_sagittal, images)
-    slices, all_head, roi_images, seg_images, fix_seg_images, open_nostril_index, edge_index = \
-                                        segment.seg_nasal_airway(slices, all_head, images,
-                                        edge_index, end_open_nose_index, naso_index, end_nasopharynx, image_type)
-    # to change the global threshold or the local threshold boundaries, replace the last code line with other HU values
-    # slices, all_head, roi_images, seg_images, fix_seg_images, open_nostril_index, edge_index =
-    # seg_nasal_airway(slices, all_head, images, edge_index, end_open_nose_index, naso_index,
-    #                  end_nasopharynx, image_type, global_thresh = -400 , local_thresh(-400 ,-125))
 
 
-    thickness = spacing[0]
-    spacing = spacing[1:]
-
-    aperture_index = msure.find_aperture(roi_images, edge_index, image_type)
-
-    choana_index = msure.find_choana(fix_seg_images, roi_images)
-    if saving_axial is True:
-        axial_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images,
-                                                 plane_mode="axial", additional_slices= all_head)
-        presentation.save_img(axial_images, save_path=save_path, mode='axial', anim=axial_anim)
-    if saving_coronal is True:
-        coronal_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images,
-                                                       plane_mode="coronal")
-        presentation.save_img(coronal_images, save_path=save_path, mode='coronal', anim=coronal_anim)
-    if model3d is True:
-        m3d.reconstruction3d(fix_seg_images[:,:,:], spacing, thickness, save_path=save_path, connected=True)
-    measurement_data = msure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing,
-                                            image_type)
-    if plot_measure is True:
-        visul.plot(measurement_data[0], aperture_index, choana_index, save_path=save_path)
-        visul.plot_inferior(measurement_data[1], aperture_index, choana_index, save_path=save_path)
-
-    if save_data is True:
-        excelpath = save_path +"\\" + 'measurements.xlsx'
-        sheet_name = [
-            ['cc volume', 'not cc volume', 'cs r data', 'cs l data', 'notcc cs r data', 'notcc cs l data'],
-            ['inferior cc volume', 'inferior not cc volume', 'inferior cs r data', 'inferior cs l data',
-             'inferior notcc cs r data', 'inferior notcc cs l data']]
-        with pd.ExcelWriter(excelpath) as writer:
-            for i in range(0, 12):
-                mode_index = i // 6
-                data_index = i % 6
-                measurement_data[mode_index][data_index].to_excel(writer,
-                                                                 sheet_name=sheet_name[mode_index][data_index])
-    if pa_width is True:
-        bone.measure_bone_distance(fix_seg_images, roi_images, aperture_index, choana_index, spacing,
-                                   thickness, save_path=save_path, hu_scale=True)
-
-
-# the additional operation need to be updated for using
+# The additional operation needs to be updated for use
 def main_compare():
     path = r"C:\Users\owner\Desktop\cases\#"
     case_df = []
     pa_indexs = []
     ch_indexs = []
-    # case_input = input("enter 2 cases to compare from 3 to 27 (exlude 24) space-separted ")
+    # case_input = input("enter 2 cases to compare from 3 to 27 (exclude 24) space-separated ")
     # case1, case2 = tuple(case for case in case_input.split())
     case1, case2 = '3', '14'
     cases_path = uf.CASE_MAP[case1] + " Via " + uf.CASE_MAP[case2]
@@ -280,14 +286,14 @@ def main_compare():
             segment.seg_nasal_airway(slices, all_head, images, thresh, edge_index, end_open_nose_index, end_nasopharynx,
                                  image_type)
         spacing, thickness = slices[0].PixelSpacing, slices[0].SliceThickness
-        aperture_index = msure.find_aperture(roi_images, edge_index)
+        aperture_index = measure.find_aperture(roi_images, edge_index)
         pa_indexs.append(aperture_index)
-        choana_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        choana_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
         ch_indexs.append(choana_index)
-        measurment_data = msure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing)
+        measurment_data = measure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing)
         case_df.append(measurment_data)
 
-    visul.plot_compare3(case_df, pa_indexs, ch_indexs, case_label, cases_path)
+    visual.plot_compare3(case_df, pa_indexs, ch_indexs, case_label, cases_path)
 
 
 def main_compare3():
@@ -296,7 +302,7 @@ def main_compare3():
     cases_inferior_df = []
     pa_indexs = []
     ch_indexs = []
-    # case_input = input("enter 2 cases to compare from 3 to 27 (exlude 24) space-separted ")
+    # case_input = input("enter 2 cases to compare from 3 to 27 (exclude 24) space-separated ")
     # case1, case2 = tuple(case for case in case_input.split())
     cases = ['21', '3', '6']
     cases_type = [1, 2, 3]
@@ -316,16 +322,16 @@ def main_compare3():
             segment.seg_nasal_airway(slices, all_head, images, thresh, edge_index, end_open_nose_index, end_nasopharynx,
                                   image_type)
         spacing, thickness = slices[0].PixelSpacing, slices[0].SliceThickness
-        aperture_index = msure.find_aperture(roi_images, edge_index)
+        aperture_index = measure.find_aperture(roi_images, edge_index)
         pa_indexs.append(aperture_index)
-        choana_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        choana_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
         ch_indexs.append(choana_index)
-        measurment_data = msure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing)
+        measurment_data = measure.measurement(fix_seg_images, aperture_index, choana_index, thickness, spacing)
         cases_df.append(measurment_data[0])
         cases_inferior_df.append(measurment_data[1])
 
-    visul.plot_compare3(cases_df, cases_type, pa_indexs, ch_indexs, "x", cases, cases_path)
-    visul.plot_compare3_inferior(cases_inferior_df, cases_type, "x", cases, cases_path)
+    visual.plot_compare3(cases_df, cases_type, pa_indexs, ch_indexs, "x", cases, cases_path)
+    visual.plot_compare3_inferior(cases_inferior_df, cases_type, "x", cases, cases_path)
 
 
 
@@ -346,9 +352,9 @@ def main_save_cornal():
         slices, all_head, roi_images, seg_images, seg_images2, fix_seg_images, fix_seg_images2, open_nostril_index = \
             segment.seg_nasal_airway(slices, all_head, images, thresh, edge_index, end_open_nose_index, end_nasopharynx,
                                  image_type)
-        aperture_index = msure.find_aperture(roi_images, edge_index)
-        choana_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
-        mid_pa, mid_ch = msure.finding_inferior_conca(fix_seg_images, aperture_index, choana_index)
+        aperture_index = measure.find_aperture(roi_images, edge_index)
+        choana_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        mid_pa, mid_ch = measure.finding_inferior_conca(fix_seg_images, aperture_index, choana_index)
         case = "#" + uf.CASE_MAP[str(i)] + "(" + str(i) + ")"
         savepath = "C:\\Users\\owner\\Desktop\\cases\\coronal_images\\" + case
         # crnl.save_coronal_bone(roi_images, aperture_index, choana_index, savepath)
@@ -376,8 +382,8 @@ def main_valdiation():
 
         # validation.update_image_to_dicom(slices,roi_images,newpath)
         vol_factor = slices[1].PixelSpacing[0] * slices[1].PixelSpacing[1] * thickness
-        aperture_index = msure.find_aperture(roi_images, edge_index,image_type)
-        choana_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        aperture_index = measure.find_aperture(roi_images, edge_index,image_type)
+        choana_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
         end = aperture_index + int(0.10 * (choana_index - aperture_index))
 
         # validation.test(newpath, np.swapaxes(fix_seg_images,0,2),aperture_index,choana_index, "Segmentation.nrrd")
@@ -434,8 +440,8 @@ def main_valdiation():
 
         # print ("result:",quality.quality_test(roi_images, fix_seg_images))
         # spacing, thickness = slices[0].PixelSpacing, slices[0].SliceThickness
-        # aperture_index = msure.find_aperture(roi_images, edge_index)
-        # choana_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        # aperture_index = measure.find_aperture(roi_images, edge_index)
+        # choana_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
         # axial_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images,plane_mode = "axial")
         # presentation.save_img(axial_images, i, mode='axial', anim=True)
         # coronal_images = presentation.presentation(slices, roi_images, seg_images, fix_seg_images, plane_mode="coronal")
@@ -477,11 +483,11 @@ def main_image():
         # import model_3d as model
         # model.reconstruction3d(fix_seg_images,slices[0].PixelSpacing, slices[0].SliceThickness, i)
 
-        pa_index = msure.find_aperture(images, edge_index, image_type)
+        pa_index = measure.find_aperture(images, edge_index, image_type)
         if i == 4:
             fix_seg_images[35:, :pa_index, :] = 0
         # bone.mid_turbinate(roi_images,fix_seg_images,pa_index)
-        ch_index = msure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
+        ch_index = measure.find_choana(fix_seg_images, roi_images, end_open_nose_index, end_nasopharynx)
 
         spacing, thickness = slices[0].PixelSpacing, slices[0].SliceThickness
         m3d.reconstruction3d(fix_seg_images, slices[0].PixelSpacing, slices[0].SliceThickness)
@@ -489,9 +495,9 @@ def main_image():
         # bone.measure_bone_distance(fix_seg_images, roi_images, pa_index, ch_index, edge_index, spacing,
         #                          thickness, savepath)
         time2 = time.time()
-        measurment_data = msure.measurement(fix_seg_images, pa_index, ch_index, thickness, spacing, image_type)
-        visul.plot(measurment_data[0], pa_index, ch_index, pathcase=i)
-        visul.plot_inferior(measurment_data[1], pa_index, ch_index, not_cc=False, pathcase=i)
+        measurment_data = measure.measurement(fix_seg_images, pa_index, ch_index, thickness, spacing, image_type)
+        visual.plot(measurment_data[0], pa_index, ch_index, pathcase=i)
+        visual.plot_inferior(measurment_data[1], pa_index, ch_index, not_cc=False, pathcase=i)
         time3 = time.time()
         timer2.append(round(time2 - time1, 2))
         timer3.append(round(time3 - time2, 2))
@@ -523,7 +529,7 @@ if __name__ == '__main__':
     main_mesurement(path=r"C:\Users\owner\Desktop\cases\#6",save_path=r"C:\Users\owner\Desktop\try", saving_coronal=False,
                     saving_axial=False, model3d=False, plot_measure=False, save_data=False, pa_width=False)
 
-    #main_standardization_3_all()
+    # main_standardization_3_all()
     # main_compare3()
     # main_bone()
 
