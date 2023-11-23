@@ -46,8 +46,20 @@ def average(exel_path, inferior=False , percent="percentage of pa-ch",min_percen
         if inferior is True:
             name = "inferior " + name
         df_temp = pd.read_excel(exel_path, sheet_name=name)
+<<<<<<< Updated upstream
         df_temp = df_temp.loc[(df_temp[percent] >= min_percent) &
                               (df_temp[percent] <= max_percent),["area"]]
+=======
+        if max_percent > 100:
+            df_temp = df_temp.loc[(df_temp[percent] >= min_percent) &
+                              (df_temp[percent] <= max_percent),["area",percent]]
+            df_temp.loc[df_temp[percent] > 100,["area"]] = df_temp[df_temp[percent] > 100]["area"].div(2)
+            df_temp = df_temp.drop(columns=[percent])
+        else:
+            df_temp = df_temp.loc[(df_temp[percent] >= min_percent) &
+                              (df_temp[percent] <= max_percent),["area"]]
+
+>>>>>>> Stashed changes
         if df_temp.empty or df_temp[df_temp["area"] > 0].empty:
             continue
 
@@ -118,9 +130,15 @@ def normalize_dataframe(df, perctange = "percentage of pa-ch"):
             ]
         normalize_df.loc[len(normalize_df.index)] = new_row
     if perctange == "percentage of pa-ch":
+<<<<<<< Updated upstream
         return normalize_df
     else:
         return normalize_df, pa_percent, ch_percent
+=======
+        return normalize_df, 0, 100
+    else:
+        return normalize_df, pa_percent.iloc[0], ch_percent.iloc[0]
+>>>>>>> Stashed changes
 
 
 
@@ -180,8 +198,15 @@ def read(excel_path, mode="1connected", inferior=False, percent_method="percenta
         data_frames[1]["area"] += data_frames[3]["area"]
         data_frames = [data_frames[0], data_frames[1]]
     if percent_method == "percentage of pa-ch":
+<<<<<<< Updated upstream
         return data_frames
     else:
+=======
+        return data_frames , 0, 100
+    else:
+        for df in data_frames:
+            df.loc[df[percent_method] > ch_percent,["area"]] = df[df[percent_method] > ch_percent]["area"].div(2)
+>>>>>>> Stashed changes
         return data_frames, pa_percent, ch_percent
 
 
@@ -495,10 +520,17 @@ def plot_compare_3(df_list, data = None, std_flag = True ,mode = "all", percent_
             plt.ylim(bottom=0, top=max_val + 20)
         else:
             plt.ylim(bottom=0, top=max_val + 0.2)
+<<<<<<< Updated upstream
         if percent_mode =="pa-ch":
             plt.axvline(x=10, color="blue", linestyle="--") # for poster
             plt.annotate("",(0,0.7), (0.1,0.7), xycoords ='axes fraction',  arrowprops=dict(arrowstyle="<->", color='blue'))
             plt.text( x=0.05,y=0.7, s="PA\n region",  transform=ax.transAxes, color='blue', ha='center', va='center' )
+=======
+        if percent_mode == "pa-ch" or percent_mode == "percentage of pa-ch":
+            # plt.axvline(x=10, color="blue", linestyle="--") # for poster
+            # plt.annotate("",(0,0.7), (0.1,0.7), xycoords ='axes fraction',  arrowprops=dict(arrowstyle="<->", color='blue'))
+            # plt.text( x=0.05,y=0.7, s="PA\n region",  transform=ax.transAxes, color='blue', ha='center', va='center' )
+>>>>>>> Stashed changes
             plt.xlabel("Normalized Distance Between The PA-Choanae(%)", fontsize=12)
         else:
             plt.axvline(x=pa_percent / 100, color="blue", linestyle="--")

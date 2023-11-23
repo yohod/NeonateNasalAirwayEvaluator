@@ -460,10 +460,17 @@ def inferior_cs_measurement(cc_label, not_cc_label, left_num, right_num, notcc_l
         not_cc_r_cs_data = uf.concat(not_cc_r_cs_data, dfr)
         not_cc_l_cs_data = uf.concat(not_cc_l_cs_data, dfl)
 
+<<<<<<< Updated upstream
     vol_r = round(cc_r_cs_data['area'].sum())
     vol_l = round(cc_l_cs_data['area'].sum())
     not_cc_vol_r = round(not_cc_r_cs_data['area'].sum())
     not_cc_vol_l = round(not_cc_l_cs_data['area'].sum())
+=======
+    vol_r = round(cc_r_cs_data['area'].sum() * spacing[0])
+    vol_l = round(cc_l_cs_data['area'].sum() * spacing[0])
+    not_cc_vol_r = round(not_cc_r_cs_data['area'].sum() * spacing[0])
+    not_cc_vol_l = round(not_cc_l_cs_data['area'].sum() * spacing[0])
+>>>>>>> Stashed changes
 
     return cc_r_cs_data, vol_r, cc_l_cs_data, vol_l, not_cc_r_cs_data, not_cc_vol_r, not_cc_l_cs_data, not_cc_vol_l
 

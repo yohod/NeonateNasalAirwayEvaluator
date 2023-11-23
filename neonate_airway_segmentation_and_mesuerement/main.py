@@ -137,6 +137,11 @@ def main_standardization_3_all(cases=range(0, 29), exclude_cases=(18, 19, 28), s
     surgery_list = []  # severe CNPAS
     pa_percent_list = []
     ch_percent_list = []
+<<<<<<< Updated upstream
+=======
+    percent_method = "percentage of nasal airway"
+    #percent_method = "percentage of pa-ch"
+>>>>>>> Stashed changes
 
     for mode in ["all", "2connected", "1"]:
         # "all" CSA - of two nasal sides. "2connected"- only the CSA of the connected airway. "1"- the average CSA of the two sides
@@ -150,7 +155,11 @@ def main_standardization_3_all(cases=range(0, 29), exclude_cases=(18, 19, 28), s
 
             # Read CSA measurement data and normalize it
             df, pa_percent, ch_percent = standard.read(exel_path, mode=mode, inferior=False,
+<<<<<<< Updated upstream
                                                        percent_method="percentage of nasal airway")
+=======
+                                                       percent_method=percent_method)
+>>>>>>> Stashed changes
             pa_percent_list.append(pa_percent)
             ch_percent_list.append(ch_percent)
 
@@ -167,7 +176,11 @@ def main_standardization_3_all(cases=range(0, 29), exclude_cases=(18, 19, 28), s
     stand_df = []
     for df_list in all_lists:
         # Standardize cases, Calculate the average CSA and STD along the normalized nasal cavity for each group.
+<<<<<<< Updated upstream
         avg_df, std_df = standard.standardize_cases(df_list, percent_col_name="percentage of nasal airway")
+=======
+        avg_df, std_df = standard.standardize_cases(df_list, percent_col_name=percent_method)
+>>>>>>> Stashed changes
         stand_df.append([avg_df, std_df])
 
     if saving_data:
@@ -190,7 +203,12 @@ def main_standardization_3_all(cases=range(0, 29), exclude_cases=(18, 19, 28), s
     pa_percent = np.round(np.mean(pa_percent_list), 1)
     ch_percent = np.round(np.mean(ch_percent_list), 1)
     # produce a qualitative graph
+<<<<<<< Updated upstream
     standard.plot_compare_3(stand_df, std_flag=std_flag, mode=mode, percent_mode="all",
+=======
+    print(path)
+    standard.plot_compare_3(stand_df, std_flag=std_flag, mode=mode, percent_mode=percent_method,
+>>>>>>> Stashed changes
                             pa_percent=pa_percent, ch_percent=ch_percent, units="mm", save_path=path)
 
 
@@ -388,7 +406,11 @@ def main_general_data(cases=range(0, 29), path=None, exclude_cases=(18, 19, 28),
                                            'p2(mwt)', 'avg(3)', 'std(3)', 'p3(mwt)', 'avg(4)', 'std(4)', 'p4(mwt)'])
 
     # List of regions and corresponding volume columns
+<<<<<<< Updated upstream
     regions_and_volumes = ['Total volume', 'nares volume', 'midnasal volume',
+=======
+    regions_and_volumes = ['Total volume', 'nares volume', 'midnasal volume', 'inferior volume',
+>>>>>>> Stashed changes
                            'nasopharynx volume', 'surface area']
 
     for region in regions_and_volumes:
