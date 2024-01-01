@@ -7,23 +7,24 @@ import cv2 as cv
 import usefull_function as uf
 
 
-# 1.1 load and sort the dicom images from the top to bottom
+# 1.1 Load and sort the dicom images from the top to bottom
 def load_dicom(path=""):
-    """load ct images from path and sort it from superior (head) to inferior (neak)
-    :param path: = the path for the CT dicom files. defualt is empty str, give posibilty to input it.
+    """ Load ct images from the path and sort it from superior (head) to inferior (neak)
+    :param path: = the path for the CT dicom files. default is empty str, give possibility to input it.
     :type path: str
     :return: sort list of  the CT slices
     :rtype: list of dicom object """
     if path == "":
         path = input("enter the path of the CT images")
     ct_images = os.listdir(path)
-    # This method returns a list containing the names of the entries in the directory given by path
+    # This method returns a list containing the names of the entries in the directory given by the path
+    
     slices = [dicom.dcmread(path + '/' + i, force=True) for i in ct_images]
-    # Read and return a dataset not in accordance with the DICOM File Format:
-    # dcmread / read_file two function for load dicom files
+    # Read and return a dataset not per the DICOM File Format:
+    # dcmread / read_file two functions for load dicom files
 
-    # sorting ct images according to their position it's more precise. the positive direction is to the superior of the body
-    # if not exist, sorting ct images by their InstanceNumber,which is the slice index.
+    # Sorting CT images according to their position it's more precise. the positive direction is to the superior of the body
+    # If not exist, sort ct images by their InstanceNumber, which is the slice index.
     if hasattr(slices[1], "ImagePositionPatient"):
         slices = sorted(slices, reverse=True, key=lambda x: x.ImagePositionPatient[2])
         sorted_by_position = True
@@ -32,9 +33,9 @@ def load_dicom(path=""):
         slices = sorted(slices, key=lambda x: x.InstanceNumber)
         sorted_by_position = False
     else:
-        print("cant be sorted")
+        print("can't be sorted")
 
-    # remove MIP images, if they exist in the beginning of the series
+    # remove MIP images, if they exist at the beginning of the series
     for i in range(0,3):
         if slices[i].PixelSpacing[0] != slices[i+1].PixelSpacing[0]:
             continue
@@ -45,7 +46,7 @@ def load_dicom(path=""):
     images = [i.pixel_array for i in slices]
 
     # calculate slice thickness using the axial direction differences in the image position.
-    # it's more accurate to use the ImagePositionPatient attribute from use SliceThickness attribute
+    # It's more accurate to use the ImagePositionPatient attribute than use SliceThickness attribute
     if sorted_by_position is True:
         slice_thickness = []
         for i in range(len(slices) - 1):
@@ -54,7 +55,7 @@ def load_dicom(path=""):
         slice_thickness = round(np.mean(slice_thickness), 3)
         reverse = slices[0].InstanceNumber > slices[1].InstanceNumber
     else:
-        # when sorting by the instance number sometimes need to reverse the order to be from superior to inferior.
+        # When sorting by the instance number sometimes need to reverse the order to be from superior to inferior.
         slices, images,reverse = reverse_order(slices,images)
         slice_thickness = slices[1].SliceThickness
 
@@ -63,18 +64,18 @@ def load_dicom(path=""):
     intercept = slices[1].RescaleIntercept
     images = uf.hu(np.array(images), slope=slope,intercept=intercept)
 
-    # spacing on (axial,coronal,sagittal) direction
+    # spacing on (axial, coronal, sagittal) direction
     spacing_xy = slices[1].PixelSpacing
     spacing = (slice_thickness, spacing_xy[0], spacing_xy[1])
 
     return slices, images, spacing, reverse
 
-# 1.2 reorder slices to begin from head's top to bottom if it was in reverse order
+# 1.2 Reorder slices to begin from head's top to bottom if it was in reverse order
 
 
 def reverse_order(slices, images):
     """reorder ct slices from head(superior) to neck(inferior) by comparing
-    the number of air objects in the begin and end of the list of images
+    the number of air objects at the beginning and end of the list of images
     :type slices: list of dicom
     :rtype: list of dicom"""
 
@@ -88,16 +89,16 @@ def reverse_order(slices, images):
         end_counter += count_obj(end_image)
 
         if start_counter - 10 >= end_counter:
-            # print (i,"r",start_counter, end_counter)
+            # print (I, "r",start_counter, end_counter)
             reverse = True
             return slices[::-1], images[::-1], reverse
 
         elif start_counter <= end_counter - 10:
-            # print (i,"V", start_counter, end_counter)
+            # print (I, "V", start_counter, end_counter)
             reverse = False
             return slices, images, reverse
 
-    # don't need this extra lines
+    # don't need these extra lines
     if start_counter > end_counter:
         reverse = True
         return slices[::-1], images[::-1], reverse
@@ -109,7 +110,7 @@ def reverse_order(slices, images):
 
 # help function for "reverse_order" function
 def count_obj(image):
-    """count the number of the air objects in the image which is bigger than 25 pixels
+    """ Count the number of the air objects in the image which is bigger than 25 pixels
     :type image: 2d np.ndarray
     :return: the number of air objects in the image
     :rtype: int"""
@@ -121,7 +122,7 @@ def count_obj(image):
 
 
 # 1.3  rotate the image if the head is tilted
-# the angle rotation for each case in my research
+# The angle rotation for each case in my research
 # To save time, and avoid having to check the correct angle every time.
 # the angle is in the XY plane
 def angle(i):
@@ -133,7 +134,7 @@ def angle(i):
 
 # rotating automatically the images in my research
 def fix_angle(images, rot_angle):
-    """rotate ct images to redirect the nose to top of the image
+    """ Rotate ct images to redirect the nose to the top of the image
     :type images: numpy 3D array of head images
     :type rot_angle: int or float
     :rtype: 3D numpy.ndarray"""
@@ -146,7 +147,7 @@ def fix_angle(images, rot_angle):
     return fix_images
 
 
-# a semi-automate method for rotate the images
+# A semi-automated method for rotating the images
 def corect_angle(images):
     """ show image and rotate with user input to direct the nose in the up direction.
     :type images: list of 2d numpy.ndarray
@@ -154,17 +155,22 @@ def corect_angle(images):
     mid_index = images.shape[0] // 2
     plt.imshow(images[mid_index], cmap=plt.cm.gray)
     plt.show()
-    angle = int(input("enter an angle to rotate int: "))
+    message = "Ensure the head is positioned with the nose facing upward.\n"\
+                " If already in this orientation, press 0.\n"\
+                " Otherwise, specify the correction angle (between -180 and 180)\n"\
+                " A positive value indicates clockwise rotation,\n"\
+                " and a negative value indicates counterclockwise rotation: "
+    angle = int(input(message))
     while (angle != 0):
         images = fix_angle(images, angle)
         plt.imshow(images[mid_index], cmap=plt.cm.gray)
         plt.show()
-        angle = int(input("enter an angle to rotate int: "))
+        angle = int(input(message))
 
     return images
 
 
-# 1.4 remove slices with lack of data, which the image is cut significantly
+# 1.4 Remove slices with a lack of data, in which the image is cut significantly
 def remove_slices(slices, images):
     """ remove the slices that are black or which a significant cutting of data
     return: updated slices and images
@@ -211,15 +217,15 @@ def remove_slices(slices, images):
 
 # 1.5 preprocessing
 def preprocessing(path, my_research=True):
-    """upload dicom files from path and preprocess the slices and images
+    """ Upload dicom files from the path and preprocess the slices and images
     :type path: str
     :rtyp
-    :return: list of dicom, 3D numpy.ndarray of images, spacing of the image in (axial,coronal,sagittal))
-    # reverse and image_for_sagittal is parameters for the sagittal presentation"""
-    slices,images, spacing ,reverse = load_dicom(path)
+    :return: list of dicom, 3D numpy.ndarray of images, spacing of the image in (axial, coronal, sagittal))
+    # reverse and image_for_sagittal are parameters for the sagittal presentation """
+    slices, images, spacing, reverse = load_dicom(path)
 
 
-    # take from path the case number
+    # take from the path the case number
     if my_research is True:
         if path[-2:].isdigit():
             case_num = path[-2:]
