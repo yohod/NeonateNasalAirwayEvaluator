@@ -158,8 +158,8 @@ def corect_angle(images):
     message = "Ensure the head is positioned with the nose facing upward.\n"\
                 " If already in this orientation, press 0.\n"\
                 " Otherwise, specify the correction angle (between -180 and 180)\n"\
-                " A positive value indicates clockwise rotation,\n"\
-                " and a negative value indicates counterclockwise rotation: "
+                " A positive value indicates counterclockwise rotation,\n"\
+                " and a negative value indicates clockwise rotation: "
     angle = int(input(message))
     while (angle != 0):
         images = fix_angle(images, angle)
